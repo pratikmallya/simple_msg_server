@@ -3,5 +3,5 @@ package main
 func main() {
 
 	r := InitializeEngine()
-	go r.Run()
+	r.Run(":8080")
 }
