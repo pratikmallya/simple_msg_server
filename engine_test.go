@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -109,4 +110,32 @@ func TestPostMsgRoute(t *testing.T) {
 			assert.Equal(t, rr.Code, testCase.expectedResponseCode[i])
 		}
 	}
+}
+
+func TestPerfWrite(t *testing.T) {
+	numreqs := 100
+	var reqs []*http.Request
+	for i := 0; i < numreqs; i++ {
+		msg := Message{
+			Username: "Spongebob",
+			Text:     "I'm Ready!",
+			Timeout:  60,
+		}
+		b, err := json.Marshal(msg)
+		assert.NoError(t, err)
+		req := httptest.NewRequest("POST", "/chat", bytes.NewBuffer(b))
+		reqs = append(reqs, req)
+	}
+
+	engine := InitializeEngine()
+
+	for i := 0; i < numreqs; i++ {
+		rr := httptest.NewRecorder()
+		engine.ServeHTTP(rr, reqs[i])
+		assert.Equal(t, 201, rr.Code)
+	}
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/chat/Spongebob", nil)
+	engine.ServeHTTP(rr, req)
+	assert.Equal(t, 200, rr.Code)
 }

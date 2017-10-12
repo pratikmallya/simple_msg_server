@@ -39,6 +39,7 @@ func InitializeEngine() *gin.Engine {
 		mutex.Lock()
 		if _, ok := m[username]; !ok {
 			c.String(http.StatusNotFound, "No unexpired messages found for %s", username)
+			mutex.Unlock()
 			return
 		}
 		msgs := m[username]
@@ -82,6 +83,7 @@ func InitializeEngine() *gin.Engine {
 			c.JSON(http.StatusCreated, gin.H{
 				"id": msg.ID,
 			})
+			mutex.Unlock()
 			return
 		}
 		m[msg.Username] = []Message{msg}
