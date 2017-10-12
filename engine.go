@@ -3,6 +3,7 @@ package main
 import (
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,7 +28,7 @@ type ReturnMessage struct {
 
 // InitializeEngine ...
 func InitializeEngine() *gin.Engine {
-
+	var mutex = &sync.Mutex{}
 	m = make(map[string][]Message)
 	rand.Seed(42)
 	r := gin.Default()
@@ -35,17 +36,21 @@ func InitializeEngine() *gin.Engine {
 	r.GET("/chat/:username", func(c *gin.Context) {
 		now := time.Now()
 		username := c.Param("username")
-
+		mutex.Lock()
 		if _, ok := m[username]; !ok {
 			c.String(http.StatusNotFound, "No unexpired messages found for %s", username)
 			return
 		}
-		retmsgs := returnUnexpiredMessages(m[username], now)
+		msgs := m[username]
+		delete(m, username)
+		mutex.Unlock()
+
+		retmsgs := returnUnexpiredMessages(msgs, now)
 		if retmsgs == nil {
 			c.String(http.StatusNotFound, "No unexpired messages found for %s", username)
 			return
 		}
-		delete(m, username)
+
 		c.JSON(200, retmsgs)
 	})
 
@@ -71,6 +76,7 @@ func InitializeEngine() *gin.Engine {
 		msg.ExpirationTime = now.Add(time.Duration(msg.Timeout) * time.Second)
 		msg.ID = rand.Int()
 
+		mutex.Lock()
 		if msgs, ok := m[msg.Username]; ok {
 			m[msg.Username] = append(msgs, msg)
 			c.JSON(http.StatusCreated, gin.H{
@@ -79,6 +85,8 @@ func InitializeEngine() *gin.Engine {
 			return
 		}
 		m[msg.Username] = []Message{msg}
+		mutex.Unlock()
+
 		c.JSON(http.StatusCreated, gin.H{
 			"id": msg.ID,
 		})
